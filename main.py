@@ -1,12 +1,13 @@
+
 import json
-#import numpy
-#import scipy
-#import pandas
+# import numpy
+# import scipy
+# import pandas
 
 from sqlalchemy import create_engine, Table, Column, MetaData, select, text, func
 from sqlalchemy import Date, Integer, String, ForeignKey
+from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.ext.declarative import declarative_base
-#from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import relationship, backref, mapper, sessionmaker
 
 # ########################################################################
@@ -39,7 +40,7 @@ def loadSession():
     Loads a sqlite database located in <dbPath>
     and returns a SQL Alchemy session
     """
-    #metadata = MetaData(engine)
+    # metadata = MetaData(engine)
     metadata = Base.metadata
 
     Session = sessionmaker(bind=engine)
@@ -78,13 +79,11 @@ def loadSession():
 # ########################################################################
 
 # Mapped Python classes to db tables (SQLAlchemy)
-
-
+'''
 class Artists(Base):
     """
     Artists represents 'artist' table
     """
-    __tablename__ = 'artist'
     #__table_args__ = {'autoload': True}
 
     ArtistId = Column(Integer, primary_key=True)
@@ -111,10 +110,22 @@ class Customers(Base):
     """
     __tablename__ = 'Customer'
     __table_args__ = {'autoload': True}  # required when not explicitly defined
-
-
+'''
 # CODE HERE AND MODIFY ABOVE IF NEEDED
 
+# automap all existing db tables
+Base = automap_base(Base)
+Base.prepare(engine, reflect=True)
+
+# some more convenient class names than Base.classes.*
+Artists = Base.classes.Artist
+Albums = Base.classes.Album
+Customers = Base.classes.Customer
+Employees = Base.classes.Employee
+Invoices = Base.classes.Invoice
+InvoiceLines = Base.classes.InvoiceLine
+Tracks = Base.classes.Track
+Playlists = Base.classes.Playlist
 
 # ########################################################################
 # ########################### DB SESSION #################################
@@ -131,7 +142,6 @@ Task 0:
 Read SQLAlchemy documenation and create python classes that are mapped to database tables (above). It is up to you whether you want to explicitly define all the columns & relationships. Artists, Albums and Customers are defined. Please note that Artists and Albums are explicitly defined with a relationship in Aritsts that points related field (reverse relationship) albums. 
 
 """
-
 
 # ########################################################################
 # ########################## TASK ONE ####################################
@@ -166,11 +176,18 @@ def count_mapped_objects(class_name, verbose=False, limit=None):
             print(">>> Row", i + 1, fields)
 
 
-#count_mapped_objects(Artists, verbose=True, limit=2)
-#count_mapped_objects(Albums)
-#count_mapped_objects(Customers)
+# count_mapped_objects(Artists, verbose=True, limit=2)
+# count_mapped_objects(Albums)
+# count_mapped_objects(Customers)
 
 # CODE HERE
+# ignore warning 'Dialect sqlite+pysqlite doesn't support Decimal objects...'
+# that's okay for our purposes.
+import warnings
+warnings.filterwarnings('ignore')
+for cls in Base.classes:
+    count_mapped_objects(cls)
+warnings.filterwarnings('default')
 
 # ########################################################################
 # ############################### TASK TWO ###############################
@@ -193,11 +210,14 @@ def check_count(table_name):
         print('> Counted %s number of rows in %s' % (row[0], table_name))
 
 
-#check_count('artist')
-#check_count('album')
-#check_count('customer')
+# check_count('artist')
+# check_count('album')
+# check_count('customer')
 
 # CODE HERE
+for cls in Base.classes:
+    table_name = cls.__table__.name
+    check_count(table_name)
 
 # ########################################################################
 # ############################### TASK THREE #############################
@@ -213,25 +233,36 @@ the python and sqlalchemy and print the top 5 (name, number of albums)
 
 def task_3_sql_version():
     # WRITE THE QUERY
-    query = ""
+    query = "select artist.name, count(*) from artist " \
+            "inner join album on album.artistid = artist.artistid " \
+            "group by artist.name " \
+            "order by count(*) desc limit 5 "
 
     if query:
         result = session.execute(text(query))
     else:
         result = []
 
-    #print("> Top 5 artists with most albums (SQL)")
+    print("> Top 5 artists with most albums (SQL)")
     # PRINT RESULTS
+    for row in result:
+        print(row)
 
 
 def task_3_python_version():
     artists = session.query(Artists).all()  # all artists
-    albums = session.query(Albums).all()  # all albums
+    # albums = session.query(Albums).all()  # not needed, albums loaded via artist relationship
 
-    #print("> Top 5 artists with most albums (Python)")
+    print("> Top 5 artists with most albums (Python)")
     # CODE HERE
+    lst = []  # list of tuples: (artist_name, album_count)
+    for artist in artists:
+        lst.append((artist.Name, len(artist.album_collection)))
+    lst.sort(reverse=True, key=lambda t: t[1])
 
     # PRINT RESULTS
+    for i in range(5):
+        print(lst[i])
 
 
 task_3_sql_version()
@@ -249,6 +280,20 @@ class Country(object):
   name      -> Name of country
   """
     # CODE HERE
+    _countries = {}  # dict of country_name : Country instance
+
+    # override __new__ to return an existing Country instance if available
+    # (to avoid duplicates)
+    def __new__(cls, country):
+        if country in Country._countries:
+            return Country._countries[country]
+        else:
+            return super(Country, cls).__new__(cls)
+
+    def __init__(self, country):
+        self.name = country
+        if country not in Country._countries:
+            Country._countries[country] = self
 
 
 class State(object):
@@ -257,6 +302,21 @@ class State(object):
   country   -> Country object
   """
     # CODE HERE
+    _states = {}  # dict of state_name : State instance
+
+    # override __new__ to return an existing State instance if available
+    # (to avoid duplicates)
+    def __new__(cls, state, country):
+        if state in State._states:
+            return State._states[state]
+        else:
+            return super(State, cls).__new__(cls)
+
+    def __init__(self, state, country):
+        self.name = state
+        if state not in State._states:
+            State._states[state] = self
+        self.country = Country(country)
 
 
 class Locality(object):
@@ -266,6 +326,22 @@ class Locality(object):
   state     -> State object
   """
     # CODE HERE
+    _localities = {}  # dict of locality_name : Locality instance
+
+    # override __new__ to return an existing Locality instance if available
+    # (to avoid duplicates)
+    def __new__(cls, city, zip_code, state, country):
+        if city in Locality._localities:
+            return Locality._localities[city]
+        else:
+            return super(Locality, cls).__new__(cls)
+
+    def __init__(self, city, zip_code, state, country):
+        self.name = city
+        if city not in Locality._localities:
+            Locality._localities[city] = self
+        self.zip_code = zip_code
+        self.state = State(state, country)
 
 
 class Address(object):
@@ -273,7 +349,11 @@ class Address(object):
   name      -> Street address
   locality  -> Locality object
   """
+
     # CODE HERE
+    def __init__(self, street, city, zip_code, state, country):
+        self.name = street
+        self.locality = Locality(city, zip_code, state, country)
 
 
 """
@@ -302,8 +382,46 @@ address = Address(name="10 Hannover Street", locality=locality_boston)
 '''
 
 all_addresses = []
+missing_addresses = []
+
 
 # CODE HERE
+
+def extract_addresses_from_customers(all_addresses, missing_addresses):
+    customers = session.query(Customers).all()  # all customers
+    for row in customers:
+        missing_data_flag = True if (None in (row.Address,
+                                              row.City,
+                                              row.PostalCode,
+                                              row.State,
+                                              row.Country)) else False
+        addr = Address(row.Address, row.City, row.PostalCode, row.State, row.Country)
+        all_addresses.append(addr)
+        if missing_data_flag: missing_addresses.append(addr)
+    return ((all_addresses, missing_addresses))
+
+
+def extract_addresses_from_invoices(all_addresses, missing_addresses):
+    invoices = session.query(Invoices).all()  # all invoices
+    for row in invoices:
+        missing_data_flag = True if (None in (row.BillingAddress,
+                                              row.BillingCity,
+                                              row.BillingPostalCode,
+                                              row.BillingState,
+                                              row.BillingCountry)) else False
+        addr = Address(row.BillingAddress,
+                       row.BillingCity,
+                       row.BillingPostalCode,
+                       row.BillingState,
+                       row.BillingCountry)
+        all_addresses.append(addr)
+        if missing_data_flag: missing_addresses.append(addr)
+    return ((all_addresses, missing_addresses))
+
+all_addresses, missing_addresses = extract_addresses_from_customers(all_addresses, missing_addresses)
+all_addresses, missing_addresses = extract_addresses_from_invoices(all_addresses, missing_addresses)
+
+print("all_addresses length is: %d" % len(all_addresses))
 
 # ########################################################################
 # ################################ TASK FIVE #############################
@@ -317,9 +435,10 @@ that gets addresses with missing components and appends them to a list. A missin
 be a zip code, state, or country. Please print out the count.
 """
 
-missing_addresses = []
+# missing_addresses = [] moved to above & populated during task 4
 
-# CODE HERE
+# CODE HERE (see task 4)
+print("missing_addresses length is %d" % len(missing_addresses))
 
 # ########################################################################
 # ################################ TASK SIX ##############################
@@ -330,6 +449,48 @@ print("\n\t########### \n\t# TASK 6  #\n\t###########\n")
 Task 6:
 Similar to Task 3, using raw sql queries and sqlalchemy, create two function that obtain the most (top 5) succesful albums in terms of highest sales. 
 """
+
+
+def task_6_sql_version():
+    query = "select a.title, sum(i.unitprice) from InvoiceLine i " \
+            "inner join Track t on t.trackid = i.trackid " \
+            "inner join Album a on a.albumid = t.albumid " \
+            "group by a.title " \
+            "order by sum(i.unitprice) desc limit 5 "
+
+    if query:
+        result = session.execute(text(query))
+    else:
+        result = []
+
+    print("> Top 5 albums with most sales (SQL)")
+    # PRINT RESULTS
+    for row in result:
+        print(row[0], "%0.2f" % row[1])
+
+
+def task_6_python_version():
+    albums = session.query(Albums).all()  # all albums
+
+    print("> Top 5 albums with most sales (Python)")
+    # CODE HERE
+    album_sales = []
+    for album in albums:
+        sales = 0.0
+        album_tracks = album.track_collection
+        for track in album_tracks:
+            for item in track.invoiceline_collection:
+                sales += float(item.UnitPrice)
+        album_sales.append((album.Title, sales))
+    album_sales.sort(reverse=True, key=lambda t: t[1])
+
+    # PRINT RESULTS
+    for i in range(5):
+        print(album_sales[i][0], "%0.2f" % album_sales[i][1])
+
+
+task_6_sql_version()
+task_6_python_version()
 
 # CODE HERE
 
@@ -342,7 +503,7 @@ print("\n\t########### \n\t# TASK 7  #\n\t###########\n")
 Task 7:
 If possible, create a dictionary (hashmap) of artists with their tracks and number of sales count.
 """
-artist_top_tracks = {}
+# artist_top_tracks = {}
 
 # e.g.
 '''
@@ -350,20 +511,47 @@ artist_top_tracks['Tan Vampire'] = {}               # adds tan vampires
 artist_top_tracks['Tan Vampire']['Digital Rot'] = 5 # adds song and sets count
 '''
 
-# CODE HERE
 
-# ########################################################################
+# CODE HERE
+def build_artist_top_tracks_dict():
+    artists = session.query(Artists).all()  # all artists & relationships
+    artist_top_tracks = {}
+    for artist in artists:
+        artist_top_tracks[artist.Name] = {}
+        for album in artist.album_collection:
+            for track in album.track_collection:
+                artist_top_tracks[artist.Name][track.Name] = len(track.invoiceline_collection)
+    return artist_top_tracks
+
+
+artist_top_tracks = build_artist_top_tracks_dict()
+print("number of items in artist_top_tracks is %d" % len(artist_top_tracks))
+print("the first 5 items are:")
+for i, (k, v) in enumerate(artist_top_tracks.items()):
+    if i > 4: break
+    print(k, '\n', v, '\n')
+
+########################################################################
 # ################################ TASK EIGHT ############################
 # ########################################################################
 
 print("\n\t########### \n\t# TASK 8  #\n\t###########\n")
 """
 Task 8:
-Do something new with SQLAlchemy or obtain some insight about the data that's interesting. 
+Explore PlaylistTrack many-to-many relationship by counting tracks per playlist.
 """
+# automap didn't create an object for the PlaylistTrack many-to-many table.
+# This is per sqlalchemy doc. so,  how are tracks in a playlist accessed?
+# or playlists including a given track? try using the relationship created by
+# automap to count the tracks in each playlist...
 
 # CODE HERE
-
+print("Explore PlaylistTrack many-to-many relationship by counting tracks per playlist.")
+print('> The first five playlists & their track counts.')
+playlists = session.query(Playlists).all()
+for i, playlist in enumerate(playlists):
+    if i > 4: break
+    print('playlist ', playlist.Name, ' has ', len(playlist.track_collection), ' tracks.')
 
 # ########################################################################
 # ################################ FINAL TASK ############################
@@ -377,6 +565,7 @@ Add any comments below related to the project, this can include feedback, questi
 '''
 
 # COMMENTS HERE
-
+As a SQLAlchemy rookie, I spent most of my time perusing the online doc.
+Hopefully using reflection/automap wasn't "cheating" on task 0 !
 
 '''
