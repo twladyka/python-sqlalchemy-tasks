@@ -1,4 +1,3 @@
-
 import json
 # import numpy
 # import scipy
@@ -477,8 +476,7 @@ def task_6_python_version():
     album_sales = []
     for album in albums:
         sales = 0.0
-        album_tracks = album.track_collection
-        for track in album_tracks:
+        for track in album.track_collection:
             for item in track.invoiceline_collection:
                 sales += float(item.UnitPrice)
         album_sales.append((album.Title, sales))
