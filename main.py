@@ -2,9 +2,8 @@ import json
 # import numpy
 # import scipy
 # import pandas
-
-from sqlalchemy import create_engine, Table, Column, MetaData, select, text, func
 from sqlalchemy import Date, Integer, String, ForeignKey
+from sqlalchemy import create_engine, Table, Column, MetaData, select, text, func
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref, mapper, sessionmaker
@@ -315,7 +314,8 @@ class State(object):
             return super(State, cls).__new__(cls)
 
     def __init__(self, state, country):
-        self.name = state if state else '<missing>' + str(country)
+        state = state if state else '<missing>' + str(country)
+        self.name = state
         if state not in State._states:
             State._states[state] = self
         self.country = Country(country)
@@ -341,7 +341,8 @@ class Locality(object):
             return super(Locality, cls).__new__(cls)
 
     def __init__(self, city, zip_code, state, country):
-        self.name = city if city else '<missing>' + str(state)
+        city = city if city else '<missing>' + str(state)
+        self.name = city
         if city not in Locality._localities:
             Locality._localities[city] = self
         self.zip_code = zip_code
