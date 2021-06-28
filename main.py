@@ -8,6 +8,7 @@ from sqlalchemy import Date, Integer, String, ForeignKey
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref, mapper, sessionmaker
+from decimal import Decimal
 
 # ########################################################################
 # ################### DOCUMENTATION LINKs ################################
@@ -306,13 +307,15 @@ class State(object):
     # override __new__ to return an existing State instance if available
     # (to avoid duplicates)
     def __new__(cls, state, country):
+        # insure unique dict key for missing state by concatenating country
+        state = state if state else '<missing>' + str(country)
         if state in State._states:
             return State._states[state]
         else:
             return super(State, cls).__new__(cls)
 
     def __init__(self, state, country):
-        self.name = state
+        self.name = state if state else '<missing>' + str(country)
         if state not in State._states:
             State._states[state] = self
         self.country = Country(country)
@@ -330,13 +333,15 @@ class Locality(object):
     # override __new__ to return an existing Locality instance if available
     # (to avoid duplicates)
     def __new__(cls, city, zip_code, state, country):
+        # insure unique dict key for missing city by concatenating state
+        city = city if city else '<missing>' + str(state)
         if city in Locality._localities:
             return Locality._localities[city]
         else:
             return super(Locality, cls).__new__(cls)
 
     def __init__(self, city, zip_code, state, country):
-        self.name = city
+        self.name = city if city else '<missing>' + str(state)
         if city not in Locality._localities:
             Locality._localities[city] = self
         self.zip_code = zip_code
@@ -467,7 +472,6 @@ def task_6_sql_version():
     for row in result:
         print(row[0], "%0.2f" % row[1])
 
-
 def task_6_python_version():
     albums = session.query(Albums).all()  # all albums
 
@@ -475,16 +479,16 @@ def task_6_python_version():
     # CODE HERE
     album_sales = []
     for album in albums:
-        sales = 0.0
+        sales = Decimal(0)
         for track in album.track_collection:
             for item in track.invoiceline_collection:
-                sales += float(item.UnitPrice)
+                sales += item.UnitPrice
         album_sales.append((album.Title, sales))
     album_sales.sort(reverse=True, key=lambda t: t[1])
 
     # PRINT RESULTS
     for i in range(5):
-        print(album_sales[i][0], "%0.2f" % album_sales[i][1])
+        print(album_sales[i][0], album_sales[i][1])
 
 
 task_6_sql_version()
