@@ -6,7 +6,7 @@ from sqlalchemy import Date, Integer, String, ForeignKey
 from sqlalchemy import create_engine, Table, Column, MetaData, select, text, func
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref, mapper, sessionmaker
+from sqlalchemy.orm import relationship, backref, mapper, sessionmaker, joinedload
 from decimal import Decimal
 
 # ########################################################################
@@ -474,15 +474,22 @@ def task_6_sql_version():
         print(row[0], "%0.2f" % row[1])
 
 def task_6_python_version():
-    albums = session.query(Albums).all()  # all albums
+    # load albums & related collections
+    albums = session.query(Albums).\
+        options(joinedload(Albums.track_collection).
+                joinedload(Tracks.invoiceline_collection)).all()
 
     print("> Top 5 albums with most sales (Python)")
     # CODE HERE
     album_sales = []
     for album in albums:
         sales = Decimal(0)
-        for track in album.track_collection:
-            for item in track.invoiceline_collection:
+        #for track in album.track_collection:
+        tracks = album.track_collection
+        for track in tracks:
+            #for item in track.invoiceline_collection:
+            items = track.invoiceline_collection
+            for item in items:
                 sales += item.UnitPrice
         album_sales.append((album.Title, sales))
     album_sales.sort(reverse=True, key=lambda t: t[1])
@@ -517,7 +524,10 @@ artist_top_tracks['Tan Vampire']['Digital Rot'] = 5 # adds song and sets count
 
 # CODE HERE
 def build_artist_top_tracks_dict():
-    artists = session.query(Artists).all()  # all artists & relationships
+    artists = session.query(Artists).\
+            options(joinedload(Artists.album_collection).
+                 joinedload(Albums.track_collection).
+                 joinedload(Tracks.invoiceline_collection)).all()  # all artists & relationships
     artist_top_tracks = {}
     for artist in artists:
         artist_top_tracks[artist.Name] = {}
